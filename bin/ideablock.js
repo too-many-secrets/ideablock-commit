@@ -8,11 +8,12 @@ const remove = require('../lib/remove')
 const help = require('../lib/help')
 const status = require('../lib/status')
 const run = require('../lib/run')
+const logout = require('../lib/logout')
 
 program
   .command('init')
   .alias('i')
-  .description('initialize automatic commit tethering to Bitcoin and Litecoin blockchains in the directory from which the command is called')
+  .description('initialize automatic commit tethering to the Bitcoin blockchain in the directory from which the command is called')
   .action(function () {
     init.init()
   })
@@ -20,7 +21,7 @@ program
 program
   .command('on')
   .alias('resume')
-  .description('Turn on automatic tethering of git commits to Bitcoin and Litecoin blockchains in directory from which the command is called.')
+  .description('Turn on automatic tethering of git commits to Bitcoin blockchain in directory from which the command is called.')
   .action(function () {
     on.on()
   })
@@ -28,7 +29,7 @@ program
 program
   .command('off')
   .alias('pause')
-  .description('Turn off automatic tethering of git commits to Bitcoin and Litecoin blockchains in the directory from which the command is called')
+  .description('Turn off automatic tethering of git commits to Bitcoin blockchain in the directory from which the command is called')
   .action(function () {
     off.off()
   })
@@ -59,6 +60,13 @@ program
   .command('run')
   .action(function () {
     run.run()
+  })
+
+program
+  .command('logout')
+  .description('Log out of Ideablock and clear cached credentials')
+  .action(function () {
+    logout.logout()
   })
 
 program.parse(process.argv)
