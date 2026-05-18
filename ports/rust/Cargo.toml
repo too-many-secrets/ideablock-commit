@@ -1,0 +1,18 @@
+[package]
+name = "ideablock-commit"
+version = "2.0.0"
+edition = "2021"
+description = "Tethers git commits to the Bitcoin blockchain via Ideablock timeglue"
+
+[[bin]]
+name = "ideablock-commit"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+dirs = "5"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
