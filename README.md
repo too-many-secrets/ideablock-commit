@@ -1,4 +1,3 @@
-#≈
 <p align="center">
   <img src="https://i.ibb.co/gLBZHSgr/IB-commit.png"/>
 </p>
