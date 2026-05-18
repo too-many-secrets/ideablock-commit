@@ -1,4 +1,8 @@
 #≈
+<p align="center">
+  <img src="https://i.ibb.co/gLBZHSgr/IB-commit.png"/>
+</p>
+
 # ideablock-commit — Setup & Development Guide
 
 Automatically tethers every `git commit` to the Bitcoin blockchain using [Ideablock](https://ideablock.com) services.
@@ -120,4 +124,4 @@ block height.
 
 **"Not authenticated. Run ideablock-commit init"**
 Your `~/.ideablock/auth.json` is missing. Run `ideablock-commit init` in any
-git repo to re-authenticate.  If you do not have a registered account, obtain one by [registering](https://app.ideablock.com/register)
+git repo to re-authenticate.  If you do not have a registered account, obtain one by [registering] (https://app.ideablock.com/register)
