@@ -1,3 +1,4 @@
+#≈
 # ideablock-commit — Setup & Development Guide
 
 Automatically tethers every `git commit` to the Bitcoin blockchain via the
