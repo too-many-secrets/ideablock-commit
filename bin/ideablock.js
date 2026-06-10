@@ -1,5 +1,19 @@
 #!/usr/bin/env node
 
+// Suppress noisy warnings emitted by old vendored deps (shelljs circular
+// requires and form-data's util.isArray DeprecationWarning). They are
+// cosmetic and break the visual flow of the CLI. Genuine errors and any
+// other warning still print.
+process.removeAllListeners('warning')
+process.on('warning', (w) => {
+  if (!w) return
+  const name = w.name || ''
+  const msg = w.message || ''
+  if (msg.includes('inside circular dependency')) return
+  if (name === 'DeprecationWarning' && /util\.(isArray|isRegExp|isDate|isBoolean|isNumber|isString|isFunction|isPrimitive|isNullOrUndefined|isUndefined|isNull|isObject|isBuffer|isError)/.test(msg)) return
+  if (typeof console.error === 'function') console.error(w.stack || msg)
+})
+
 const program = require('commander')
 const init = require('../lib/init')
 const on = require('../lib/on')
