@@ -1,0 +1,55 @@
+name: release
+
+# Cross-compiles the Go port (ports/go) into standalone binaries and attaches
+# them to the GitHub Release whenever a version tag is pushed, e.g.:
+#
+#   git tag v2.0.0 && git push origin v2.0.0
+#
+# This backs the "GitHub Releases — download the latest binary" option on the
+# Ideablock commits page. The Go port has no third-party deps, so the binaries
+# are self-contained (no Node/runtime required).
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build binary
+        working-directory: ports/go
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          ext=""
+          if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
+          out="ideablock-commit-${GOOS}-${GOARCH}${ext}"
+          go build -trimpath -ldflags="-s -w" -o "$out" .
+          echo "ASSET=ports/go/$out" >> "$GITHUB_ENV"
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
+          fail_on_unmatched_files: true
