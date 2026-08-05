@@ -1,6 +1,6 @@
 {
   "name": "ideablock-commit",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "CLI tool for anchoring git commit hashes to the Bitcoin blockchain via Ideablock",
   "main": "ideablock.js",
   "bin": {

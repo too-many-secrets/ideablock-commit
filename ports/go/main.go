@@ -4,13 +4,16 @@
 // timeglue service. Identical functionality to the Node.js original.
 //
 // Build:
-//   go mod init ideablock-commit && go mod tidy && go build -o ideablock-commit .
+//
+//	go mod init ideablock-commit && go mod tidy && go build -o ideablock-commit .
 //
 // Install:
-//   go install .
+//
+//	go install .
 //
 // Usage:
-//   ideablock-commit init|on|off|status|remove|run|logout
+//
+//	ideablock-commit init|on|off|status|remove|run|logout
 package main
 
 import (
@@ -43,9 +46,9 @@ var (
 // ── Models ────────────────────────────────────────────────────────────────────
 
 type AuthFile struct {
-	Token       string  `json:"token"`
+	Token        string `json:"token"`
 	TokenExpires int64  `json:"token_expires"`
-	User        struct {
+	User         struct {
 		ID        string `json:"id"`
 		Email     string `json:"email"`
 		FirstName string `json:"first_name"`
@@ -180,9 +183,14 @@ func cmdInit() {
 	var password string
 	fmt.Scanln(&password)
 
-	resp, err := postJSON(ideablockAPI+"/api/login", map[string]string{
+	// Mint a long-lived, commit-scoped CLI token rather than taking a session.
+	// The session token expires in fifteen minutes, which meant re-running init
+	// constantly; a CLI token ends only when it is revoked.
+	host, _ := os.Hostname()
+	resp, err := postJSON(ideablockAPI+"/api/cli/token", map[string]string{
 		"email":    email,
 		"password": password,
+		"label":    "ideablock-commit (go) on " + host,
 	}, "")
 	if err != nil {
 		fmt.Printf("\n\t❌ Could not reach Ideablock API: %v\n", err)
@@ -198,10 +206,16 @@ func cmdInit() {
 	var result map[string]any
 	json.NewDecoder(resp.Body).Decode(&result)
 
-	newAuth := AuthFile{
-		Token:        result["token"].(string),
-		TokenExpires: int64(result["token_expires"].(float64)),
-		CachedAt:     time.Now().Unix(),
+	tok, _ := result["token"].(string)
+	if tok == "" {
+		fmt.Println("\n\t❌ Ideablock did not return a token.")
+		return
+	}
+	newAuth := AuthFile{Token: tok, CachedAt: time.Now().Unix()}
+	// A CLI token carries no expiry. Older servers returned one; keep reading it
+	// so this build still works against them.
+	if exp, ok := result["token_expires"].(float64); ok {
+		newAuth.TokenExpires = int64(exp)
 	}
 	if u, ok := result["user"].(map[string]any); ok {
 		newAuth.User.ID = fmt.Sprint(u["id"])
@@ -306,7 +320,10 @@ func cmdRun() {
 		fmt.Println("\n\t❌ Not authenticated. Run \"ideablock-commit init\" to log in.")
 		return
 	}
-	if auth.TokenExpires > 0 && auth.TokenExpires <= time.Now().Unix() {
+	// A CLI token (ibk_...) has no expiry — it ends when revoked. Only a legacy
+	// session token stored by an older build carries one.
+	isCLIToken := strings.HasPrefix(auth.Token, "ibk_")
+	if !isCLIToken && auth.TokenExpires > 0 && auth.TokenExpires <= time.Now().Unix() {
 		os.Remove(authFilePath)
 		fmt.Println("\n\t❌ Your Ideablock session has expired. Run \"ideablock-commit init\" to log in again.")
 		return
