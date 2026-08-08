@@ -325,7 +325,8 @@ fn cmd_run() {
     // 7. Timeglue
     print!("\n\tTethering commit to Bitcoin blockchain");
     io::stdout().flush().unwrap();
-    let glue_body = json!({ "userID": auth.user.id, "hash": repo_hash });
+    // The composite is the committed value — see lib/run.js.
+    let glue_body = json!({ "userID": auth.user.id, "hash": tethered_hash });
     let glue_resp = post_json(&format!("{}/glue", timeglue_url()), &glue_body, None);
     let btc_tx_id = match glue_resp {
         None => { println!("\n\t❌ Failed to reach timeglue. Is it running?"); return; }

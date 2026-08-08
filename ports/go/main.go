@@ -370,7 +370,8 @@ func cmdRun() {
 	fmt.Print("\n\tTethering commit to Bitcoin blockchain")
 	glueResp, err := postJSON(timeglueURL+"/glue", map[string]string{
 		"userID": userID,
-		"hash":   repoHash,
+		// The composite is the committed value — see lib/run.js.
+		"hash":   tetheredHash,
 	}, "")
 	if err != nil {
 		fmt.Printf("\n\t❌ Failed to reach timeglue: %v\n", err)
