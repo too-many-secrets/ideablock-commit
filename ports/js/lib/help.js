@@ -23,6 +23,6 @@ module.exports.help = function () {
   log(chalk.bold.rgb(254, 123, 34)('\tinit (or "i")') + ':\t\t  Initializes automatic git commit blockchain tethering in the present repository.\n\n')
   log(chalk.bold.rgb(254, 123, 34)('\ton (or "resume")') + ':\t  Turns on (resumes) automatic commit tethering in the present repository.\n\n')
   log(chalk.bold.rgb(254, 123, 34)('\toff (or "pause")') + ':\t  Turns off (pauses) automatic commit tethering in the present repository.\n\n')
-  log(chalk.bold.rgb(254, 123, 34)('\tstatus (or "ping")') + ':\t  Prints whether IdeaBlock Commit is currently initialized and on or off in the present repository\n\n')
-  log(chalk.bold.rgb(254, 123, 34)('\tremove (or "uninstall")') + ':  Removes IdeaBlock Commit automatic blockchain tethering functionality from the present repository\n\n')
+  log(chalk.bold.rgb(254, 123, 34)('\tstatus (or "ping")') + ':\t  Prints whether Ideablock Commit is currently initialized and on or off in the present repository\n\n')
+  log(chalk.bold.rgb(254, 123, 34)('\tremove (or "uninstall")') + ':  Removes Ideablock Commit automatic blockchain tethering functionality from the present repository\n\n')
 }

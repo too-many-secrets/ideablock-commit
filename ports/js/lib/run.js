@@ -255,7 +255,7 @@ module.exports.run = function () {
       process.exit(0)
     })
   } else {
-    log('\n\t❗ ' + chalk.bold('IdeaBlock Commit is currently set to ') + chalk.bold.rgb(242, 24, 0)('OFF') + chalk.bold(' in this repository.'))
+    log('\n\t❗ ' + chalk.bold('Ideablock Commit is currently set to ') + chalk.bold.rgb(242, 24, 0)('OFF') + chalk.bold(' in this repository.'))
     log('\t   Please run "ideablock-commit on" in the root directory of this repository to turn on automatic commit blockchain tethering functionality.')
     process.exit(0)
   }

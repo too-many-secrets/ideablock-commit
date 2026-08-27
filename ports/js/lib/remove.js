@@ -10,14 +10,14 @@ const log = console.log
 
 module.exports.remove = function () {
   if (!f.isRepo()) {
-    log('\n\t❗ IdeaBlock Commit: The current directory is not a git repository.')
+    log('\n\t❗ Ideablock Commit: The current directory is not a git repository.')
     log('\t   Please initialize a git repository in the present directory or change to the root of a git repository.\n')
   } else if (!(f.exists(confFile) && f.exists(confHook))) {
-    log('\n\t❗ IdeaBlock Commit has not yet been initialized in this repository.')
+    log('\n\t❗ Ideablock Commit has not yet been initialized in this repository.')
     log('\t   Please run "ideablock-commit init" in the current directory before invoking the "off" function.\n')
   } else if (f.exists(confFile) || f.exists(gitHook)) {
     fs.removeSync(path.join(process.cwd(), '.ideablock'))
     fs.removeSync(gitHook)
-    log('\n\t🗑️  ' + chalk('IdeaBlock Commit has been removed from the current repository.\n'))
+    log('\n\t🗑️  ' + chalk('Ideablock Commit has been removed from the current repository.\n'))
   }
 }
