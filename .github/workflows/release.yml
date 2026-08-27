@@ -8,6 +8,12 @@ name: release
 # This backs the "GitHub Releases — download the latest binary" option on the
 # Ideablock commits page. The Go port has no third-party deps, so the binaries
 # are self-contained (no Node/runtime required).
+#
+# It also bumps the Homebrew formula, because nothing else did. The tap sat
+# three versions behind for weeks and served the build with the random parity
+# digit from the commits page, next to npm, as an equal option. Anything a
+# signup page offers has to be released by the same act that releases
+# everything else, or it drifts silently and you find out from a user.
 
 on:
   push:
@@ -60,3 +66,71 @@ jobs:
         with:
           files: ${{ env.ASSET }}
           fail_on_unmatched_files: true
+
+  # ── Homebrew ──────────────────────────────────────────────────────────────
+  #
+  # Runs after the binaries so a failed build never publishes a formula for a
+  # release that does not exist.
+  #
+  # The formula points at the npm tarball, which is published by hand and may
+  # not exist yet when the tag lands. So this waits for it rather than assuming
+  # an order, and fails loudly if it never appears — a stale formula is the
+  # thing this job exists to prevent, so it must not exit quietly.
+  homebrew:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version from the tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Wait for the npm tarball, then hash it
+        run: |
+          url="https://registry.npmjs.org/ideablock-commit/-/ideablock-commit-${VERSION}.tgz"
+          for attempt in $(seq 1 30); do
+            if curl -sfL --max-time 30 "$url" -o pkg.tgz; then
+              echo "npm has ${VERSION} (attempt ${attempt})"
+              break
+            fi
+            if [ "$attempt" = "30" ]; then
+              echo "::error::ideablock-commit@${VERSION} never appeared on npm after 15 minutes."
+              echo "::error::Tag and publish go together — run 'npm publish', then re-run this job."
+              exit 1
+            fi
+            sleep 30
+          done
+          # Verify it is the version claimed, not a redirect or an error page
+          # saved as a file: a wrong sha256 breaks brew install for everyone.
+          got=$(tar -xzOf pkg.tgz package/package.json | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1)
+          if [ "$got" != "$VERSION" ]; then
+            echo "::error::tarball reports version ${got}, expected ${VERSION}"
+            exit 1
+          fi
+          echo "SHA256=$(sha256sum pkg.tgz | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+      - name: Check out the tap
+        uses: actions/checkout@v4
+        with:
+          repository: too-many-secrets/homebrew-tap
+          # GITHUB_TOKEN only reaches this repository. Pushing to the tap needs
+          # a PAT with contents:write on it, stored as HOMEBREW_TAP_TOKEN.
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Bump the formula
+        working-directory: tap
+        run: |
+          f=Formula/ideablock-commit.rb
+          sed -i "s|ideablock-commit-[0-9.]*\.tgz|ideablock-commit-${VERSION}.tgz|" "$f"
+          sed -i "s|sha256 \"[0-9a-f]\{64\}\"|sha256 \"${SHA256}\"|" "$f"
+          if git diff --quiet; then
+            echo "formula already at ${VERSION} — nothing to do"
+            exit 0
+          fi
+          grep -E 'url|sha256' "$f"
+          git config user.name  "Eli Sheets"
+          git config user.email "eli.sheets@gmail.com"
+          git commit -qam "ideablock-commit ${VERSION}
+
+          Bumped by the release workflow from tag ${GITHUB_REF_NAME}.
+          sha256 verified against the published npm tarball."
+          git push
