@@ -37,8 +37,7 @@ logout    Clear cached credentials
 
 | Variable | Default | Description |
 |---|---|---|
-| `TIMEGLUE_URL` | `http://localhost:2312` | Bitcoin stamping service |
-| `IDEABLOCK_API_URL` | `http://localhost:3000` | Ideablock backend |
+| `IDEABLOCK_API_URL` | `https://app.ideablock.com` | Ideablock backend |
 
 ---
 

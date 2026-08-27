@@ -10,7 +10,7 @@ const figlet = require('figlet')
 const fetch = require('node-fetch')
 const inquirer = require('inquirer')
 
-const ideablockAPIURL = process.env.IDEABLOCK_API_URL || 'http://localhost:3000'
+const ideablockAPIURL = process.env.IDEABLOCK_API_URL || 'https://app.ideablock.com'
 const repoName = path.basename(process.cwd())
 const contents = '"#!/bin/bash\nideablock-commit run "'
 const authFilePath = path.join(os.homedir(), '.ideablock', 'auth.json')

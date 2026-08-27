@@ -1,3 +1,4 @@
 
 .ideablock
 ports/rust/target/
+*.tgz

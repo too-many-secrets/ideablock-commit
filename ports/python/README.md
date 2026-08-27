@@ -77,8 +77,7 @@ ideablock-commit logout    # Clear cached credentials
 ## Environment variables
 
 ```bash
-export TIMEGLUE_URL=http://localhost:2312      # Bitcoin stamping service
-export IDEABLOCK_API_URL=http://localhost:3000 # Ideablock backend
+export IDEABLOCK_API_URL=https://app.ideablock.com # Ideablock backend
 ```
 
 ---

@@ -31,7 +31,7 @@
 
 /* ── Config ──────────────────────────────────────────────────────────────── */
 
-#define IDEABLOCK_API_DEFAULT "http://localhost:3000"
+#define IDEABLOCK_API_DEFAULT "https://app.ideablock.com"
 #define HOOK_CONTENT          "#!/bin/bash\nideablock-commit run\n"
 #define CONF_FILE             ".ideablock/ideablock.json"
 #define HOOK_SCRIPT           ".ideablock/post-commit"

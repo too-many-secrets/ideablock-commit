@@ -1,7 +1,8 @@
 // ideablock-commit — Go port
 //
-// Tethers every git commit to the Bitcoin blockchain via Ideablock's
-// timeglue service. Identical functionality to the Node.js original.
+// Tethers every git commit to the Bitcoin blockchain, through Ideablock's
+// authenticated anchor endpoint. Identical functionality to the Node.js
+// original, including the parity derivation — see deriveParity.
 //
 // Build:
 //
