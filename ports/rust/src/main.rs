@@ -57,7 +57,8 @@ fn auth_file() -> PathBuf {
 const CONF_FILE: &str = ".ideablock/ideablock.json";
 const HOOK_SCRIPT: &str = ".ideablock/post-commit";
 const GIT_HOOK: &str = ".git/hooks/post-commit";
-const HOOK_CONTENT: &str = "#!/bin/bash\nideablock-commit run\n";
+const HOOK_SHEBANG: &str = "#!/bin/sh";
+const HOOK_COMMAND: &str = "ideablock-commit run";
 
 // ── Models ────────────────────────────────────────────────────────────────────
 
@@ -135,11 +136,22 @@ fn write_auth(auth: &AuthFile) -> io::Result<()> {
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
 }
 
+/// Install by appending, never by truncating -- see the note in main.go.
 fn write_hook(path: &str) -> io::Result<()> {
     let p = Path::new(path);
     fs::create_dir_all(p.parent().unwrap())?;
-    fs::write(p, HOOK_CONTENT)?;
-    fs::set_permissions(p, fs::Permissions::from_mode(0o744))
+    let existing = fs::read_to_string(p).unwrap_or_default();
+    if existing.lines().any(|l| l.trim() == HOOK_COMMAND) {
+        return Ok(());
+    }
+    let body = if existing.trim().is_empty() {
+        format!("{}\n{}\n", HOOK_SHEBANG, HOOK_COMMAND)
+    } else {
+        let gap = if existing.ends_with('\n') { "" } else { "\n" };
+        format!("{}{}{}\n", existing, gap, HOOK_COMMAND)
+    };
+    fs::write(p, body)?;
+    fs::set_permissions(p, fs::Permissions::from_mode(0o755))
 }
 
 fn git_output(args: &[&str]) -> String {

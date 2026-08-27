@@ -40,7 +40,8 @@ define('AUTH_FILE', HOME . '/.ideablock/auth.json');
 define('CONF_FILE', '.ideablock/ideablock.json');
 define('HOOK_SCRIPT', '.ideablock/post-commit');
 define('GIT_HOOK', '.git/hooks/post-commit');
-define('HOOK_CONTENT', "#!/bin/bash\nideablock-commit run\n");
+define('HOOK_SHEBANG', '#!/bin/sh');
+define('HOOK_COMMAND', 'ideablock-commit run');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -74,11 +75,31 @@ function writeAuth(array $data): void {
     chmod(AUTH_FILE, 0600);
 }
 
+// Install by appending, never by truncating.
+// 
+// Writing the file outright replaced whatever was there. If the user already
+// had a post-commit hook -- a linter, commit signing, a CI trigger --
+// installing Ideablock destroyed it with no warning.
+// 
+// Skipping when our line is already present keeps a second init from adding a
+// second copy, which would anchor every commit twice.
+// 
+// /bin/sh rather than /bin/bash: nothing in a one-line script needs bash, and
+// bash is absent from Alpine and most minimal containers.
 function writeHook(string $path): void {
     $dir = dirname($path);
     if (!is_dir($dir)) mkdir($dir, 0755, true);
-    file_put_contents($path, HOOK_CONTENT);
-    chmod($path, 0744);
+    $existing = is_file($path) ? file_get_contents($path) : '';
+    foreach (preg_split('/\r?\n/', $existing) as $line) {
+        if (trim($line) === HOOK_COMMAND) return;
+    }
+    if (trim($existing) === '') {
+        $body = HOOK_SHEBANG . "\n" . HOOK_COMMAND . "\n";
+    } else {
+        $body = $existing . (substr($existing, -1) === "\n" ? '' : "\n") . HOOK_COMMAND . "\n";
+    }
+    file_put_contents($path, $body);
+    chmod($path, 0755);
 }
 
 function gitOutput(string ...$args): string {

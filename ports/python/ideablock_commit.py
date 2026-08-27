@@ -56,7 +56,8 @@ CONF_FILE = Path(".ideablock/ideablock.json")
 HOOK_SCRIPT = Path(".ideablock/post-commit")
 GIT_HOOK = Path(".git/hooks/post-commit")
 
-HOOK_CONTENT = "#!/bin/bash\nideablock-commit run\n"
+HOOK_SHEBANG = "#!/bin/sh"
+HOOK_COMMAND = "ideablock-commit run"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -86,9 +87,17 @@ def write_auth(data: dict):
     AUTH_FILE.chmod(0o600)
 
 def write_hook(path: Path):
+    """Install by appending, never by truncating -- see the note in main.go."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(HOOK_CONTENT)
-    path.chmod(0o744)
+    existing = path.read_text() if path.exists() else ""
+    if any(line.strip() == HOOK_COMMAND for line in existing.splitlines()):
+        return
+    if existing.strip() == "":
+        body = HOOK_SHEBANG + "\n" + HOOK_COMMAND + "\n"
+    else:
+        body = existing + ("" if existing.endswith("\n") else "\n") + HOOK_COMMAND + "\n"
+    path.write_text(body)
+    path.chmod(0o755)
 
 def git_output(*args) -> str:
     result = subprocess.run(["git"] + list(args), capture_output=True, text=True)

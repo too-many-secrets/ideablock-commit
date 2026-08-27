@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>   /* isxdigit, for derive_parity */
 #include <time.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -32,7 +33,8 @@
 /* ── Config ──────────────────────────────────────────────────────────────── */
 
 #define IDEABLOCK_API_DEFAULT "https://app.ideablock.com"
-#define HOOK_CONTENT          "#!/bin/bash\nideablock-commit run\n"
+#define HOOK_SHEBANG          "#!/bin/sh"
+#define HOOK_COMMAND          "ideablock-commit run"
 #define CONF_FILE             ".ideablock/ideablock.json"
 #define HOOK_SCRIPT           ".ideablock/post-commit"
 #define GIT_HOOK              ".git/hooks/post-commit"
@@ -104,17 +106,36 @@ static void write_conf(int on) {
     fclose(f);
 }
 
+/* Install by appending, never by truncating -- see the note in main.go. */
 static void write_hook(const char *path) {
     /* ensure parent dir exists */
     char dir[BUF_SIZE];
     strncpy(dir, path, sizeof(dir)-1);
     char *slash = strrchr(dir, '/');
     if (slash) { *slash = '\0'; mkdir(dir, 0755); }
+
+    /* Already installed? Leave the file alone. */
+    char existing[BUF_SIZE * 4] = {0};
+    size_t len = 0;
+    FILE *r = fopen(path, "r");
+    if (r) {
+        len = fread(existing, 1, sizeof(existing) - 1, r);
+        fclose(r);
+        existing[len] = '\0';
+        if (strstr(existing, HOOK_COMMAND)) return;
+    }
+
     FILE *f = fopen(path, "w");
     if (!f) return;
-    fputs(HOOK_CONTENT, f);
+    if (len == 0) {
+        fputs(HOOK_SHEBANG "\n" HOOK_COMMAND "\n", f);
+    } else {
+        fputs(existing, f);
+        if (existing[len - 1] != '\n') fputc('\n', f);
+        fputs(HOOK_COMMAND "\n", f);
+    }
     fclose(f);
-    chmod(path, 0744);
+    chmod(path, 0755);
 }
 
 static char *git_output(const char *args) {

@@ -176,15 +176,44 @@ func postJSON(url string, body any, token string) (*http.Response, error) {
 	return http.DefaultClient.Do(req)
 }
 
+// Install by appending, never by truncating.
+//
+// Writing the file outright replaced whatever was there. If the user already
+// had a post-commit hook -- a linter, commit signing, a CI trigger --
+// installing Ideablock destroyed it with no warning.
+//
+// Skipping when our line is already present keeps a second init from adding a
+// second copy, which would anchor every commit twice.
+//
+// /bin/sh rather than /bin/bash: nothing in a one-line script needs bash, and
+// bash is absent from Alpine and most minimal containers.
 func writeHook(hookPath string) error {
-	script := "#!/bin/bash\nideablock-commit run\n"
+	const shebang, command = "#!/bin/sh", "ideablock-commit run"
 	if err := os.MkdirAll(filepath.Dir(hookPath), 0755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(hookPath, []byte(script), 0744); err != nil {
+	existing, err := os.ReadFile(hookPath)
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	return os.Chmod(hookPath, 0744)
+	for _, line := range strings.Split(string(existing), "\n") {
+		if strings.TrimSpace(line) == command {
+			return nil
+		}
+	}
+	body := string(existing)
+	if strings.TrimSpace(body) == "" {
+		body = shebang + "\n" + command + "\n"
+	} else {
+		if !strings.HasSuffix(body, "\n") {
+			body += "\n"
+		}
+		body += command + "\n"
+	}
+	if err := os.WriteFile(hookPath, []byte(body), 0755); err != nil {
+		return err
+	}
+	return os.Chmod(hookPath, 0755)
 }
 
 // ── Commands ──────────────────────────────────────────────────────────────────

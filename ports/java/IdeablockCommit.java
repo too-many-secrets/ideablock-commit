@@ -57,7 +57,8 @@ public class IdeablockCommit {
     static final Path CONF_FILE = Path.of(".ideablock/ideablock.json");
     static final Path HOOK_SCRIPT = Path.of(".ideablock/post-commit");
     static final Path GIT_HOOK = Path.of(".git/hooks/post-commit");
-    static final String HOOK_CONTENT = "#!/bin/bash\nideablock-commit run\n";
+    static final String HOOK_SHEBANG = "#!/bin/sh";
+    static final String HOOK_COMMAND = "ideablock-commit run";
 
     static final HttpClient HTTP = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
@@ -128,9 +129,16 @@ public class IdeablockCommit {
             PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
     }
 
+    /** Install by appending, never by truncating -- see the note in main.go. */
     static void writeHook(Path path) throws IOException {
         Files.createDirectories(path.getParent());
-        Files.writeString(path, HOOK_CONTENT);
+        String existing = Files.exists(path) ? Files.readString(path) : "";
+        for (String line : existing.split("\r?\n"))
+            if (line.trim().equals(HOOK_COMMAND)) return;
+        String body = existing.trim().isEmpty()
+            ? HOOK_SHEBANG + "\n" + HOOK_COMMAND + "\n"
+            : existing + (existing.endsWith("\n") ? "" : "\n") + HOOK_COMMAND + "\n";
+        Files.writeString(path, body);
         setPermissions(path, Set.of(
             PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
             PosixFilePermission.OWNER_EXECUTE,

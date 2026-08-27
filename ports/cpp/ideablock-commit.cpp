@@ -78,7 +78,8 @@ static fs::path auth_file() { return home_dir() / ".ideablock" / "auth.json"; }
 static const char* CONF_FILE   = ".ideablock/ideablock.json";
 static const char* HOOK_SCRIPT = ".ideablock/post-commit";
 static const char* GIT_HOOK    = ".git/hooks/post-commit";
-static const char* HOOK_CONTENT = "#!/bin/bash\nideablock-commit run\n";
+static const char* HOOK_SHEBANG = "#!/bin/sh";
+static const char* HOOK_COMMAND = "ideablock-commit run";
 
 // ── HTTP ──────────────────────────────────────────────────────────────────────
 
@@ -161,8 +162,19 @@ static void write_conf(bool on) {
     write_file(CONF_FILE, std::string("{\"on\":") + (on ? "true" : "false") + "}");
 }
 
+// Install by appending, never by truncating -- see the note in main.go.
 static void write_hook(const std::string& path) {
-    write_file(path, HOOK_CONTENT, 0744);
+    std::string existing = read_file(path);
+    if (existing.find(HOOK_COMMAND) != std::string::npos) return;
+    std::string body;
+    if (existing.find_first_not_of(" \t\r\n") == std::string::npos) {
+        body = std::string(HOOK_SHEBANG) + "\n" + HOOK_COMMAND + "\n";
+    } else {
+        body = existing;
+        if (body.back() != '\n') body += '\n';
+        body += std::string(HOOK_COMMAND) + "\n";
+    }
+    write_file(path, body, 0755);
 }
 
 static std::string git_output(const std::string& args) {
