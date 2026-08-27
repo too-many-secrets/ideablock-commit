@@ -26,12 +26,24 @@ use sha2::{Digest, Sha256};
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-fn timeglue_url() -> String {
-    env::var("TIMEGLUE_URL").unwrap_or_else(|_| "http://localhost:2312".into())
+// Anchoring goes through Ideablock's authenticated proxy, never straight to
+// timeglue: timeglue binds to 127.0.0.1 on the app VM and is unreachable from
+// anywhere else. The direct endpoint also takes a userID and no token, so
+// exposing it would let anyone stamp under any account.
+//
+// derive_parity mirrors deriveParity in lib/run.js and must stay identical
+// across every port: the digit is part of the value that goes on chain, so a
+// port computing it differently anchors a different record for the same commit.
+fn derive_parity(short_hash: &str, repo_hash: &str) -> u8 {
+    let sum: u32 = format!("{}{}", short_hash, repo_hash)
+        .chars()
+        .filter_map(|c| c.to_digit(16))
+        .sum();
+    (sum % 10) as u8
 }
 
 fn ideablock_api() -> String {
-    env::var("IDEABLOCK_API_URL").unwrap_or_else(|_| "http://localhost:3000".into())
+    env::var("IDEABLOCK_API_URL").unwrap_or_else(|_| "https://app.ideablock.com".into())
 }
 
 fn home_dir() -> PathBuf {
@@ -318,18 +330,23 @@ fn cmd_run() {
     let repo_hash = sha256_file(&zip_path).expect("sha256 failed");
 
     // 6. Parity + tethered hash
-    let parity: u8 = rand::random::<u8>() % 10;
+    let parity: u8 = derive_parity(&short_hash, &repo_hash);
     let tethered_hash = format!("{}{}{}", short_hash, repo_hash, parity);
     let committed_at = chrono::Utc::now().to_rfc3339();
 
-    // 7. Timeglue
+    // 7. Anchor, through Ideablock's authenticated proxy
     print!("\n\tTethering commit to Bitcoin blockchain");
     io::stdout().flush().unwrap();
-    // The composite is the committed value — see lib/run.js.
-    let glue_body = json!({ "userID": auth.user.id, "hash": tethered_hash });
-    let glue_resp = post_json(&format!("{}/glue", timeglue_url()), &glue_body, None);
+    // The composite is the committed value — see lib/run.js. No userID: the
+    // server reads the caller from the token.
+    let glue_body = json!({ "hash": tethered_hash });
+    let glue_resp = post_json(
+        &format!("{}/api/commit-ideas/glue", ideablock_api()),
+        &glue_body,
+        Some(auth.token.as_str()),
+    );
     let btc_tx_id = match glue_resp {
-        None => { println!("\n\t❌ Failed to reach timeglue. Is it running?"); return; }
+        None => { println!("\n\t❌ Failed to reach Ideablock."); return; }
         Some(v) => v["btcTx"].as_str().unwrap_or("").to_string(),
     };
     println!(" ✅");

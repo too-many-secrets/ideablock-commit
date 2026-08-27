@@ -18,8 +18,23 @@
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-define('TIMEGLUE_URL', getenv('TIMEGLUE_URL') ?: 'http://localhost:2312');
-define('IDEABLOCK_API', getenv('IDEABLOCK_API_URL') ?: 'http://localhost:3000');
+// Anchoring goes through Ideablock's authenticated proxy, never straight to
+// timeglue: timeglue binds to 127.0.0.1 on the app VM and is unreachable from
+// anywhere else. The direct endpoint also takes a userID and no token, so
+// exposing it would let anyone stamp under any account.
+// 
+// deriveParity mirrors deriveParity in lib/run.js and must stay identical across
+// every port: the digit is part of the value that goes on chain, so a port
+// computing it differently anchors a different record for the same commit.
+define('IDEABLOCK_API', getenv('IDEABLOCK_API_URL') ?: 'https://app.ideablock.com');
+
+function deriveParity(string $shortHash, string $repoHash): int {
+    $sum = 0;
+    foreach (str_split(strtolower($shortHash . $repoHash)) as $c) {
+        if (ctype_xdigit($c)) $sum += hexdec($c);
+    }
+    return $sum % 10;
+}
 define('HOME', getenv('HOME') ?: posix_getpwuid(posix_getuid())['dir']);
 define('AUTH_FILE', HOME . '/.ideablock/auth.json');
 define('CONF_FILE', '.ideablock/ideablock.json');
@@ -236,15 +251,17 @@ function cmdRun(): void {
     $repoHash = sha256File($zipPath);
 
     // 6. Parity + tethered hash
-    $parity = rand(0, 9);
+    $parity = deriveParity($shortHash, $repoHash);
     $tetheredHash = $shortHash . $repoHash . $parity;
     $committedAt = gmdate('c');
 
-    // 7. Timeglue
+    // 7. Anchor, through Ideablock's authenticated proxy
     echo "\n\tTethering commit to Bitcoin blockchain";
-    $glue = postJSON(TIMEGLUE_URL . '/glue', ['userID' => $userID, 'hash' => $repoHash]);
+    // The composite is the committed value, not the bare digest. No userID:
+    // the server reads the caller from the token.
+    $glue = postJSON(IDEABLOCK_API . '/api/commit-ideas/glue', ['hash' => $tetheredHash], $token);
     if (!$glue) {
-        echo "\n\t❌ Failed to reach timeglue. Is it running?\n";
+        echo "\n\t❌ Failed to reach Ideablock.\n";
         return;
     }
     $btcTxID = $glue['body']['btcTx'] ?? '';

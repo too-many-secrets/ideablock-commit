@@ -41,11 +41,18 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
+          IDEABLOCK_API_URL: "https://app.ideablock.com"
         run: |
           ext=""
           if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
           out="ideablock-commit-${GOOS}-${GOARCH}${ext}"
-          go build -trimpath -ldflags="-s -w" -o "$out" .
+          # -X main.defaultAPI is not optional. Without it the binary keeps its
+          # source default, and a downloaded release points at a server on the
+          # user's own machine — the tool would appear broken on first run for
+          # everyone who is not us.
+          go build -trimpath \
+            -ldflags="-s -w -X main.defaultAPI=${IDEABLOCK_API_URL}" \
+            -o "$out" .
           echo "ASSET=ports/go/$out" >> "$GITHUB_ENV"
 
       - name: Attach to release

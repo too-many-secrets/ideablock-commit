@@ -31,7 +31,6 @@
 
 /* ── Config ──────────────────────────────────────────────────────────────── */
 
-#define TIMEGLUE_URL_DEFAULT  "http://localhost:2312"
 #define IDEABLOCK_API_DEFAULT "http://localhost:3000"
 #define HOOK_CONTENT          "#!/bin/bash\nideablock-commit run\n"
 #define CONF_FILE             ".ideablock/ideablock.json"
@@ -56,9 +55,21 @@ static size_t write_cb(void *ptr, size_t size, size_t nmemb, ResponseBuf *buf) {
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
-static const char *timeglue_url(void) {
-    const char *e = getenv("TIMEGLUE_URL");
-    return e ? e : TIMEGLUE_URL_DEFAULT;
+/* Anchoring goes through Ideablock's authenticated proxy, never straight to
+timeglue: timeglue binds to 127.0.0.1 on the app VM and is unreachable from
+anywhere else. The direct endpoint also takes a userID and no token, so
+exposing it would let anyone stamp under any account.
+
+derive_parity mirrors deriveParity in lib/run.js and must stay identical across
+every port: the digit is part of the value that goes on chain, so a port
+computing it differently anchors a different record for the same commit. */
+static int derive_parity(const char *short_hash, const char *repo_hash) {
+    int sum = 0;
+    for (const char *p = short_hash; *p; p++)
+        if (isxdigit((unsigned char)*p)) sum += (int)strtol((char[]){*p, 0}, NULL, 16);
+    for (const char *p = repo_hash; *p; p++)
+        if (isxdigit((unsigned char)*p)) sum += (int)strtol((char[]){*p, 0}, NULL, 16);
+    return sum % 10;
 }
 
 static const char *ideablock_api(void) {
@@ -365,23 +376,24 @@ static void cmd_run(void) {
     if (!sha256_file(zip_path, repo_hash)) { puts("\n\t❌ SHA-256 failed."); return; }
 
     /* 6. Parity + tethered hash */
-    int parity = rand() % 10;
+    int parity = derive_parity(short_hash, repo_hash);
     char tethered_hash[BUF_SIZE];
     snprintf(tethered_hash, sizeof(tethered_hash), "%s%s%d", short_hash, repo_hash, parity);
     time_t now = time(NULL);
     char committed_at[64];
     strftime(committed_at, sizeof(committed_at), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
 
-    /* 7. Timeglue */
+    /* 7. Anchor, through Ideablock's authenticated proxy.
+       The composite is the committed value, not the bare digest. No userID:
+       the server reads the caller from the token. */
     printf("\n\tTethering commit to Bitcoin blockchain"); fflush(stdout);
     char glue_body[BUF_SIZE];
-    snprintf(glue_body, sizeof(glue_body),
-        "{\"userID\":\"%s\",\"hash\":\"%s\"}", user_id, repo_hash);
+    snprintf(glue_body, sizeof(glue_body), "{\"hash\":\"%s\"}", tethered_hash);
     char glue_url[BUF_SIZE];
-    snprintf(glue_url, sizeof(glue_url), "%s/glue", timeglue_url());
-    char *glue_resp = post_json(glue_url, glue_body, NULL);
+    snprintf(glue_url, sizeof(glue_url), "%s/api/commit-ideas/glue", ideablock_api());
+    char *glue_resp = post_json(glue_url, glue_body, token);
     if (!glue_resp) {
-        puts("\n\t❌ Failed to reach timeglue. Is it running?"); return;
+        puts("\n\t❌ Failed to reach Ideablock."); return;
     }
     char btc_tx_id[256] = {0};
     json_get_str(glue_resp, "btcTx", btc_tx_id, sizeof(btc_tx_id));

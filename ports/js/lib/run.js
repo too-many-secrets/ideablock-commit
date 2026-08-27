@@ -7,13 +7,16 @@ const fs = require('fs-extra')
 const async = require('async')
 const fetch = require('node-fetch')
 const os = require('os')
-const Table = require('cli-table2')
+const Table = require('cli-table3')
 const chalk = require('chalk')
 const Ora = require('ora')
 const f = require('./helpers.js')
 
-const timeglueURL = process.env.TIMEGLUE_URL || 'http://localhost:2312'
-const ideablockAPIURL = process.env.IDEABLOCK_API_URL || 'http://localhost:3000'
+// Anchoring goes through Ideablock's authenticated proxy, never straight to
+// timeglue: timeglue binds to 127.0.0.1 on the app VM and is unreachable from
+// anywhere else. The direct endpoint also takes a userID and no token, so
+// exposing it would let anyone stamp under any account.
+const ideablockAPIURL = process.env.IDEABLOCK_API_URL || 'https://app.ideablock.com'
 
 const log = console.log
 let jsonAuthContents = {}
@@ -64,6 +67,19 @@ const spinUp = {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+// Mirror of deriveParity in lib/run.js. Must stay identical across every
+// port: the digit is part of the value that goes on chain, so a port computing
+// it differently anchors a different record for the same commit.
+function deriveParity (shortHash, repoHash) {
+  const digits = (shortHash + repoHash).toLowerCase()
+  let sum = 0
+  for (let i = 0; i < digits.length; i++) {
+    const v = parseInt(digits[i], 16)
+    if (!isNaN(v)) sum += v
+  }
+  return sum % 10
+}
 
 function getParity () {
   return Math.floor(Math.random() * Math.floor(10))
@@ -138,7 +154,7 @@ function hashRepo (zipFile, commitMessage, shortHash, apiToken, callback) {
 
 // 6. Stamp on Bitcoin via timeglue, sync to backend, display results
 function sendOut (repoHash, commitMessage, shortHash, apiToken, callback) {
-  const parity = getParity()
+  const parity = deriveParity(shortHash, repoHash)
   const spinner = new Ora({ spinner: spinUp, indent: 5 })
   spinner.start('  Tethering Commit to Bitcoin Blockchain')
 
@@ -151,14 +167,19 @@ function sendOut (repoHash, commitMessage, shortHash, apiToken, callback) {
                  jsonAuthContents.userId ||
                  (apiToken ? apiToken.substring(0, 16) : 'unknown')
 
-  // ── Call timeglue ─────────────────────────────────────────────────────────
-  fetch(timeglueURL + '/glue', {
+  // ── Anchor, through Ideablock's authenticated proxy ───────────────────────
+  // The composite is the committed value, not the bare digest. No userID: the
+  // server reads the caller from the token.
+  fetch(ideablockAPIURL + '/api/commit-ideas/glue', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userID, hash: repoHash })
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiToken
+    },
+    body: JSON.stringify({ hash: blockchainTetheredHash })
   })
     .then(res => {
-      if (!res.ok) throw new Error('timeglue returned status ' + res.status)
+      if (!res.ok) throw new Error('Ideablock returned status ' + res.status)
       return res.json()
     })
     .then(glueResult => {

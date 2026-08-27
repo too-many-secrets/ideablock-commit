@@ -34,10 +34,24 @@ public class IdeablockCommit {
 
     // ── Config ────────────────────────────────────────────────────────────────
 
-    static final String TIMEGLUE_URL =
-        System.getenv().getOrDefault("TIMEGLUE_URL", "http://localhost:2312");
+    // Anchoring goes through Ideablock's authenticated proxy, never straight to
+    // timeglue: timeglue binds to 127.0.0.1 on the app VM and is unreachable from
+    // anywhere else. The direct endpoint also takes a userID and no token, so
+    // exposing it would let anyone stamp under any account.
+    // 
+    // deriveParity mirrors deriveParity in lib/run.js and must stay identical across
+    // every port: the digit is part of the value that goes on chain, so a port
+    // computing it differently anchors a different record for the same commit.
+    static int deriveParity(String shortHash, String repoHash) {
+        int sum = 0;
+        for (char c : (shortHash + repoHash).toLowerCase().toCharArray()) {
+            int v = Character.digit(c, 16);
+            if (v >= 0) sum += v;
+        }
+        return sum % 10;
+    }
     static final String IDEABLOCK_API =
-        System.getenv().getOrDefault("IDEABLOCK_API_URL", "http://localhost:3000");
+        System.getenv().getOrDefault("IDEABLOCK_API_URL", "https://app.ideablock.com");
     static final Path HOME = Path.of(System.getProperty("user.home"));
     static final Path AUTH_FILE = HOME.resolve(".ideablock/auth.json");
     static final Path CONF_FILE = Path.of(".ideablock/ideablock.json");
@@ -295,16 +309,18 @@ public class IdeablockCommit {
         String repoHash = sha256File(zipPath);
 
         // 6. Parity + tethered hash
-        int parity = new Random().nextInt(10);
+        int parity = deriveParity(shortHash, repoHash);
         String tetheredHash = shortHash + repoHash + parity;
         String committedAt = Instant.now().toString();
 
-        // 7. Timeglue
+        // 7. Anchor, through Ideablock's authenticated proxy
         System.out.print("\n\tTethering commit to Bitcoin blockchain");
-        String glueBody = buildJSON("userID", userID, "hash", repoHash);
-        String glueResp = postJSON(TIMEGLUE_URL + "/glue", glueBody, null);
+        // The composite is the committed value, not the bare digest. No
+        // userID: the server reads the caller from the token.
+        String glueBody = buildJSON("hash", tetheredHash);
+        String glueResp = postJSON(IDEABLOCK_API + "/api/commit-ideas/glue", glueBody, token);
         if (glueResp == null) {
-            System.out.println("\n\t❌ Failed to reach timeglue. Is it running?");
+            System.out.println("\n\t❌ Failed to reach Ideablock.");
             return;
         }
         String btcTxID = jsonGet(glueResp.substring(4), "btcTx");

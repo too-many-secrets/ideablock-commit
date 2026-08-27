@@ -54,8 +54,24 @@ static std::string getenv_or(const char* key, const char* fallback) {
     return v ? v : fallback;
 }
 
-static std::string TIMEGLUE_URL() { return getenv_or("TIMEGLUE_URL", "http://localhost:2312"); }
-static std::string IDEABLOCK_API() { return getenv_or("IDEABLOCK_API_URL", "http://localhost:3000"); }
+// Anchoring goes through Ideablock's authenticated proxy, never straight to
+// timeglue: timeglue binds to 127.0.0.1 on the app VM and is unreachable from
+// anywhere else. The direct endpoint also takes a userID and no token, so
+// exposing it would let anyone stamp under any account.
+// 
+// derive_parity mirrors deriveParity in lib/run.js and must stay identical across
+// every port: the digit is part of the value that goes on chain, so a port
+// computing it differently anchors a different record for the same commit.
+static std::string IDEABLOCK_API() { return getenv_or("IDEABLOCK_API_URL", "https://app.ideablock.com"); }
+
+static int derive_parity(const std::string& short_hash, const std::string& repo_hash) {
+    int sum = 0;
+    for (char c : short_hash + repo_hash) {
+        if (std::isxdigit(static_cast<unsigned char>(c)))
+            sum += std::stoi(std::string(1, c), nullptr, 16);
+    }
+    return sum % 10;
+}
 static fs::path home_dir() { return std::getenv("HOME") ? std::getenv("HOME") : "/tmp"; }
 static fs::path auth_file() { return home_dir() / ".ideablock" / "auth.json"; }
 
@@ -289,17 +305,18 @@ static void cmd_run() {
 
     std::string repo_hash = sha256_file(zip_path);
 
-    std::mt19937 rng(std::random_device{}());
-    int parity = std::uniform_int_distribution<>(0, 9)(rng);
+    int parity = derive_parity(short_hash, repo_hash);
     std::string tethered_hash = short_hash + repo_hash + std::to_string(parity);
 
     time_t now = time(nullptr);
     char ts[64]; strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
 
     std::cout << "\n\tTethering commit to Bitcoin blockchain" << std::flush;
-    std::string glue_body = "{\"userID\":\"" + user_id + "\",\"hash\":\"" + repo_hash + "\"}";
-    std::string glue_resp = post_json(TIMEGLUE_URL() + "/glue", glue_body);
-    if (glue_resp.empty()) { std::cout << "\n\t❌ Failed to reach timeglue.\n"; return; }
+    // The composite is the committed value, not the bare digest. No userID:
+    // the server reads the caller from the token.
+    std::string glue_body = "{\"hash\":\"" + tethered_hash + "\"}";
+    std::string glue_resp = post_json(IDEABLOCK_API() + "/api/commit-ideas/glue", glue_body, token);
+    if (glue_resp.empty()) { std::cout << "\n\t❌ Failed to reach Ideablock.\n"; return; }
     std::string btc_tx_id = json_get(glue_resp, "btcTx");
     std::cout << " ✅\n";
 

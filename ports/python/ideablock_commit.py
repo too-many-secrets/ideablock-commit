@@ -32,8 +32,23 @@ import requests
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-TIMEGLUE_URL = os.environ.get("TIMEGLUE_URL", "http://localhost:2312")
-IDEABLOCK_API = os.environ.get("IDEABLOCK_API_URL", "http://localhost:3000")
+# Anchoring goes through Ideablock's authenticated proxy, never straight to
+# timeglue: timeglue binds to 127.0.0.1 on the app VM and is unreachable from
+# anywhere else. The direct endpoint also takes a userID and no token, so
+# exposing it would let anyone stamp under any account.
+IDEABLOCK_API = os.environ.get("IDEABLOCK_API_URL", "https://app.ideablock.com")
+
+_HEX = "0123456789abcdefABCDEF"
+
+
+def derive_parity(short_hash: str, repo_hash: str) -> int:
+    """Mirror of deriveParity in lib/run.js.
+
+    Must stay identical across every port: the digit is part of the value that
+    goes on chain, so a port computing it differently anchors a different
+    record for the same commit.
+    """
+    return sum(int(c, 16) for c in (short_hash + repo_hash) if c in _HEX) % 10
 
 HOME = Path.home()
 AUTH_FILE = HOME / ".ideablock" / "auth.json"
@@ -237,23 +252,26 @@ def cmd_run():
     repo_hash = sha256_file(zip_path)
 
     # 6. Parity + tethered hash
-    parity = random.randint(0, 9)
+    parity = derive_parity(short_hash, repo_hash)
     tethered_hash = f"{short_hash}{repo_hash}{parity}"
     committed_at = datetime.now(timezone.utc).isoformat()
 
-    # 7. Timeglue
+    # 7. Anchor, through Ideablock's authenticated proxy
     print("\n\tTethering commit to Bitcoin blockchain", end="", flush=True)
     try:
+        # The composite is the committed value, not the bare digest. No userID:
+        # the server reads the caller from the token.
         glue_resp = requests.post(
-            f"{TIMEGLUE_URL}/glue",
-            json={"userID": user_id, "hash": repo_hash},
+            f"{IDEABLOCK_API}/api/commit-ideas/glue",
+            json={"hash": tethered_hash},
+            headers={"Authorization": f"Bearer {token}"},
             timeout=30,
         )
         glue_resp.raise_for_status()
         btc_tx_id = glue_resp.json().get("btcTx", "")
         print(" ✅")
     except requests.RequestException as e:
-        print(f"\n\t❌ Failed to reach timeglue: {e}")
+        print(f"\n\t❌ Failed to reach Ideablock: {e}")
         print("\t   Is timeglue running? Start it with: MOCK_MODE=true ./timeglue")
         return
 

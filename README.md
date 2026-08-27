@@ -53,9 +53,9 @@ On every `git commit`, the hook automatically:
 3. Gets the commit message
 4. Archives the repo via `git archive` → `~/.ideablock/commits/{repo}/{hash}/Commit-{hash}.zip`
 5. SHA-256s the archive → **Repository Hash**
-6. Generates a random **Parity Digit** (0–9)
+6. Derives the **Parity Digit**: the hex digits of `shortHash + repoHash`, summed, mod 10
 7. Constructs the **Bitcoin-Tethered Hash**: `shortHash + repoHash + parityDigit`
-8. POSTs the Repository Hash to timeglue → receives a Bitcoin transaction ID
+8. POSTs the Bitcoin-Tethered Hash to Ideablock, which anchors it → receives a Bitcoin transaction ID
 9. Saves a `commitData.json` record locally at `~/.ideablock/commits/{repo}/{hash}/`
 10. Best-effort syncs the record to the Ideablock backend for webapp display
 11. Prints the commit information table to your terminal
@@ -112,9 +112,47 @@ After a commit, look up the Bitcoin transaction ID on
 https://mempool.space/tx/{btcTxID}
 ```
 
-The OP_RETURN output will contain the Ideablock prefix followed by the
-Repository Hash — permanent, public proof that your code existed at that
-block height.
+The OP_RETURN output contains the Ideablock prefix (`**IDEA**`) followed by the
+**Bitcoin-Tethered Hash** — permanent, public proof that your code existed at
+that block height.
+
+### Verifying a stamp yourself
+
+Every character of the anchored value is reproducible from the archive alone.
+Given `Commit-{hash}.zip`:
+
+```bash
+shortHash=$(git log -1 --pretty=format:%h)
+repoHash=$(shasum -a 256 "Commit-${shortHash}.zip" | cut -d' ' -f1)
+
+combined="${shortHash}${repoHash}"
+sum=0
+for (( i=0; i<${#combined}; i++ )); do
+  sum=$(( sum + 16#${combined:i:1} ))
+done
+
+echo "${combined}$(( sum % 10 ))"
+```
+
+(Requires bash, not sh — it uses bash arithmetic and substring syntax.)
+
+That value should match the OP_RETURN payload after the `**IDEA**` prefix.
+
+### Anchor formats
+
+Three formats exist on chain. Which one a given stamp uses is recorded against
+the commit in Ideablock, so verification never has to guess:
+
+| Format | Payload | Length | Written by |
+|---|---|---|---|
+| 1 | `sha256(archive)` | 64 | npm ≤ 2.1.0, and all language ports before this release |
+| 2 | `shortHash + repoHash + random digit` | 72 | the composite window, between 2.1.0 and this release |
+| 3 | `shortHash + repoHash + derived digit` | 72 | current — fully recomputable, as above |
+
+Formats 2 and 3 are the same shape and cannot be told apart from the payload
+alone. **A format-2 stamp will not reproduce the derived parity digit**, and
+that mismatch means the format, not a tampered record. Verify format 2 by
+checking the first 71 characters and disregarding the last.
 
 ---
 

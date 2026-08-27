@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -33,9 +32,19 @@ import (
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
+// defaultAPI is the build-time default, replaced at release time with
+// -ldflags "-X main.defaultAPI=https://app.ideablock.com". Without that, a
+// downloaded binary would point at a server on the user's own machine.
+var defaultAPI = "https://app.ideablock.com"
+
 var (
-	timeglueURL    = getEnv("TIMEGLUE_URL", "http://localhost:2312")
-	ideablockAPI   = getEnv("IDEABLOCK_API_URL", "http://localhost:3000")
+	// Anchoring goes through Ideablock's authenticated proxy, never straight to
+	// timeglue. timeglue binds to 127.0.0.1 on the app VM and is unreachable
+	// from anywhere else, so a direct call could only ever have worked against
+	// a local dev instance — and exposing it publicly would let anyone stamp
+	// under any userID, since that endpoint takes a userID in the body and no
+	// token.
+	ideablockAPI   = getEnv("IDEABLOCK_API_URL", defaultAPI)
 	homeDir, _     = os.UserHomeDir()
 	authFilePath   = filepath.Join(homeDir, ".ideablock", "auth.json")
 	confFileName   = ".ideablock/ideablock.json"
@@ -137,6 +146,23 @@ func sha256File(path string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+// deriveParity mirrors deriveParity in lib/run.js. It must stay identical
+// across every port: the digit is part of the value that goes on chain, so a
+// port that computes it differently anchors a different record for the same
+// commit.
+func deriveParity(shortHash, repoHash string) int {
+	sum := 0
+	for _, c := range strings.ToLower(shortHash + repoHash) {
+		switch {
+		case c >= '0' && c <= '9':
+			sum += int(c - '0')
+		case c >= 'a' && c <= 'f':
+			sum += int(c-'a') + 10
+		}
+	}
+	return sum % 10
 }
 
 func postJSON(url string, body any, token string) (*http.Response, error) {
@@ -328,8 +354,9 @@ func cmdRun() {
 		fmt.Println("\n\t❌ Your Ideablock session has expired. Run \"ideablock-commit init\" to log in again.")
 		return
 	}
+	// userID is no longer read here: the anchor call carries a token and the
+	// server derives the caller from it.
 	token := auth.Token
-	userID := auth.User.ID
 
 	// 2. Short hash
 	shortHash, err := gitOutput("log", "-1", "--pretty=format:%h")
@@ -362,20 +389,20 @@ func cmdRun() {
 	}
 
 	// 6. Parity + tethered hash
-	parity := rand.Intn(10)
+	parity := deriveParity(shortHash, repoHash)
 	tetheredHash := fmt.Sprintf("%s%s%d", shortHash, repoHash, parity)
 	committedAt := time.Now().UTC().Format(time.RFC3339)
 
-	// 7. Timeglue
+	// 7. Anchor, through Ideablock's authenticated proxy
 	fmt.Print("\n\tTethering commit to Bitcoin blockchain")
-	glueResp, err := postJSON(timeglueURL+"/glue", map[string]string{
-		"userID": userID,
+	// No userID in the body — the server reads it from the token. Sending one
+	// would be a claim the caller is not entitled to make.
+	glueResp, err := postJSON(ideablockAPI+"/api/commit-ideas/glue", map[string]string{
 		// The composite is the committed value — see lib/run.js.
-		"hash":   tetheredHash,
-	}, "")
+		"hash": tetheredHash,
+	}, token)
 	if err != nil {
-		fmt.Printf("\n\t❌ Failed to reach timeglue: %v\n", err)
-		fmt.Println("\t   Is timeglue running? Start it with: MOCK_MODE=true ./timeglue")
+		fmt.Printf("\n\t❌ Failed to reach Ideablock: %v\n", err)
 		return
 	}
 	defer glueResp.Body.Close()
