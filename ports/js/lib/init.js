@@ -36,11 +36,25 @@ const loginQuestions = [
 ]
 
 function addIgnoreLine (callback) {
-  fs.ensureFile(path.join(process.cwd(), '.gitignore'))
-    .then(() => {
-      shell.exec('> .gitignore && echo "\n.ideablock" >> .gitignore', { silent: true }, function (code, out, err) {
-        callback(null)
-      })
+  // Append, never truncate. This file belongs to the user's repo: the old
+  // `> .gitignore` wiped every existing rule, which at best re-introduced
+  // node_modules to their diff and at worst un-ignored a .env that git had
+  // been keeping out of the history.
+  const ignorePath = path.join(process.cwd(), '.gitignore')
+  fs.ensureFile(ignorePath)
+    .then(() => fs.readFile(ignorePath, 'utf8'))
+    .then((contents) => {
+      if (contents.split(/\r?\n/).some((line) => line.trim() === '.ideablock')) return
+      const gap = contents.length === 0 || contents.endsWith('\n') ? '' : '\n'
+      return fs.appendFile(ignorePath, gap + '.ideablock\n')
+    })
+    .then(() => callback(null))
+    .catch((err) => {
+      // Not fatal to setup, but say so rather than leaving them to find out
+      // when .ideablock shows up in a commit.
+      log(chalk.yellow('\t   Could not update .gitignore: ' + err.message))
+      log(chalk.yellow('\t   Add a line reading .ideablock to it yourself.\n'))
+      callback(null)
     })
 }
 
