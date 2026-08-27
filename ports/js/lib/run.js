@@ -186,6 +186,15 @@ function sendOut (repoHash, commitMessage, shortHash, apiToken, callback) {
       spinner.stop()
       const btcTxID = glueResult.btcTx
 
+      // The server waits a bounded time for the broadcast before answering, so
+      // this is normally the real txid. When the queue is busy it can still
+      // come back empty — the anchor is queued and will complete, but this
+      // response missed it. Never print an empty cell for it: a blank under
+      // "successfully tethered" reads as a failure of the one thing the user
+      // came for.
+      const btcTxDisplay = btcTxID ||
+        chalk.yellow('anchoring — appears on your commits page shortly')
+
       const commitObj = {
         repoName,
         shortHash,
@@ -208,7 +217,7 @@ function sendOut (repoHash, commitMessage, shortHash, apiToken, callback) {
           const table = new Table({ style: { head: [], border: [] } })
           table.push(
             [{ colSpan: 2, content: chalk.bold.rgb(242, 24, 0)('Commit Information:') }],
-            [chalk.yellow('Bitcoin Hash:'), btcTxID],
+            [chalk.yellow('Bitcoin Hash:'), btcTxDisplay],
             [chalk.white('Commit Short Hash:'), shortHash],
             [chalk.green('Repository Hash:'), repoHash],
             [chalk.red('Parity Digit'), parity],
