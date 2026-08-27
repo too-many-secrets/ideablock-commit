@@ -79,7 +79,7 @@ function banner () {
   log(chalk.bold.rgb(255, 216, 100)('/___/\\__,_/\\___/\\__,_/_.___/_/\\____/\\___/_/|_|   \\____/_____/___/    '))
   log('\n')
   log(chalk.bold.white('Please login with your Ideablock credentials.'))
-  log(chalk.gray('(You can sign up at https://ideablock.io)\n'))
+  log(chalk.gray('(You can sign up at https://app.ideablock.com/register)\n'))
 }
 
 function authorize () {
@@ -116,7 +116,7 @@ function authorize () {
         .then(res => {
           if (res.status === 401 || res.status === 403 || res.status === 500) {
             log(chalk.red('\n\t❌ We cannot find an Ideablock account with those credentials.'))
-            log(chalk.red('\t   Please visit https://ideablock.io to register.\n'))
+            log(chalk.red('\t   Please visit https://app.ideablock.com/register to create one.\n'))
             process.exit(0)
           } else if (res.status === 200) {
             res.json()
