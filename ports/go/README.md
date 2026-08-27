@@ -1,5 +1,15 @@
 # ideablock-commit — Go
 
+> **Supported client.**
+>
+> Along with the Node CLI, this is one of two clients Ideablock builds,
+> releases and keeps current. Binaries for macOS, Linux and Windows are
+> attached to every
+> [release](https://github.com/too-many-secrets/ideablock-commit/releases) with
+> the production API baked in — no Node, no toolchain, nothing to configure.
+>
+> Build from source only if you want to; the released binary is the same code.
+
 Tethers every `git commit` to the Bitcoin blockchain via Ideablock's timeglue service.
 
 ---

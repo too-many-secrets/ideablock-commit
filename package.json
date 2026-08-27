@@ -1,6 +1,6 @@
 {
   "name": "ideablock-commit",
-  "version": "3.0.2",
+  "version": "3.1.0",
   "description": "CLI tool for anchoring git commit hashes to the Bitcoin blockchain via Ideablock",
   "main": "ideablock.js",
   "bin": {
@@ -39,5 +39,13 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js"
-  }
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "packaging/",
+    "README.md",
+    "SETUP.md",
+    "LICENSE"
+  ]
 }

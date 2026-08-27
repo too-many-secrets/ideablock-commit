@@ -1,5 +1,17 @@
 # ideablock-commit — Java
 
+> **Reference implementation — not a supported client.**
+>
+> This port documents that Ideablock's hashing and anchoring format can be
+> reproduced in any language, which is the point of a record meant to be
+> independently verifiable. It is not built, released, or guaranteed to stay in
+> step with the supported clients, and it authenticates with a session token
+> that expires after fifteen minutes — unsuitable for a hook that runs on every
+> commit, unattended.
+>
+> The supported clients are the **Node CLI** (`npm install -g ideablock-commit`)
+> and the **Go binary** ([releases](https://github.com/too-many-secrets/ideablock-commit/releases)).
+
 Tethers every `git commit` to the Bitcoin blockchain via Ideablock's timeglue service.
 
 ---

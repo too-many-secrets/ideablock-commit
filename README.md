@@ -8,14 +8,44 @@ Automatically tethers every `git commit` to the Bitcoin blockchain using [Ideabl
 
 ---
 
+## Clients
+
+Two supported clients, and both anchor an identical value:
+
+| Client | Install | Needs |
+|---|---|---|
+| **Node CLI** | `npm install -g ideablock-commit` | Node 18+ |
+| **Go binary** | [download a release](https://github.com/too-many-secrets/ideablock-commit/releases) | nothing — single static binary |
+
+The Go binary exists for people who would rather not install Node. Either
+produces the same on-chain record for the same commit.
+
+`ports/` holds implementations in seven further languages — Rust, Python, PHP,
+Java, C, C++, and plain Node. **They are reference implementations, not
+supported clients.** They document that the hashing and anchoring format can be
+reproduced anywhere, which matters for a record meant to be independently
+verifiable. They are not built, released, or kept in step release-to-release,
+and they authenticate with a session token that expires after fifteen minutes,
+which makes them unsuitable for a hook that runs unattended. Read them; do not
+depend on them.
+
 ## Prerequisites
 
 - An [Ideablock](https://app.ideablock.com) account (for authentication)
+- `git` on your `PATH` — the tool shells out to `git archive` and `git log`.
+  On Windows that means [Git for Windows](https://git-scm.com/download/win),
+  which also provides the shell that runs the commit hook.
+- Node 18 or later, for the Node CLI
 
 ## Install globally
 
 ```bash
-# From this repo root
+npm install -g ideablock-commit
+```
+
+Or from a clone:
+
+```bash
 npm install
 npm install -g .
 ```
