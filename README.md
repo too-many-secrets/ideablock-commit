@@ -168,21 +168,21 @@ echo "${combined}$(( sum % 10 ))"
 
 That value should match the OP_RETURN payload after the `**IDEA**` prefix.
 
-### Anchor formats
+### What goes on chain
 
-Three formats exist on chain. Which one a given stamp uses is recorded against
-the commit in Ideablock, so verification never has to guess:
+The OP_RETURN payload is 72 characters, and every one of them is reproducible
+from the archive:
 
-| Format | Payload | Length | Written by |
-|---|---|---|---|
-| 1 | `sha256(archive)` | 64 | npm ≤ 2.1.0, and all language ports before this release |
-| 2 | `shortHash + repoHash + random digit` | 72 | the composite window, between 2.1.0 and this release |
-| 3 | `shortHash + repoHash + derived digit` | 72 | current — fully recomputable, as above |
+```
+0e6cd60  180985c0…af96e13  1
+└─────┘  └──────────────┘  └┘
+short    sha256(archive)   parity
+(7)      (64)              (1)
+```
 
-Formats 2 and 3 are the same shape and cannot be told apart from the payload
-alone. **A format-2 stamp will not reproduce the derived parity digit**, and
-that mismatch means the format, not a tampered record. Verify format 2 by
-checking the first 71 characters and disregarding the last.
+Nothing else is published. The archive itself never leaves your machine unless
+you upload it deliberately, so the chain carries a fingerprint of your code and
+not your code.
 
 ---
 
