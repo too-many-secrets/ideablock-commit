@@ -1,10 +1,34 @@
 <p align="center">
-  <img src="https://i.ibb.co/gLBZHSgr/IB-commit.png"/>
+  <img src="https://raw.githubusercontent.com/too-many-secrets/ideablock-commit/master/assets/ib-commit.png" alt="Ideablock Commit"/>
 </p>
 
-# Ideablock Commit — Setup & Development Guide
+# Prove when you wrote it
 
-Automatically tethers every `git commit` to the Bitcoin blockchain using [Ideablock](https://ideablock.com) services.
+Tethers every `git commit` to the Bitcoin blockchain — automatically, in the
+background, without your code ever leaving your machine.
+
+```bash
+npm install -g ideablock-commit
+```
+
+## Why
+
+Git proves the *order* of your commits. It does not prove *when* they happened.
+A date in git is whatever the committer's clock said, author dates can be set
+to anything, and history can be rewritten and force-pushed.
+
+That is fine until it matters: a contractor claims they brought the idea in, a
+competitor ships something you built first, or you need to show prior art
+before a filing. At that point "it's in our repo" is your word against theirs,
+and the repo is yours to change.
+
+This writes a fingerprint of each commit into a Bitcoin transaction. The
+block's timestamp becomes the latest moment that code can have existed, and
+anyone can verify it — without your permission, without your repository, and
+without Ideablock. We cannot alter it either, which is the point.
+
+Your code never leaves your machine. What goes on chain is a SHA-256 of the
+archive, not the archive.
 
 ---
 
@@ -192,3 +216,24 @@ not your code.
 **"Not authenticated. Run ideablock-commit init"**
 Your `~/.ideablock/auth.json` is missing. Run `ideablock-commit init` in any
 git repo to re-authenticate.  If you do not have a registered account, obtain one by [registering](https://app.ideablock.com/register)
+
+**"Not recorded to Ideablock — you have used all of your protections"**
+Your account's allowance is used up. **The commit was still tethered to
+Bitcoin and saved locally** — only the copy of the record in your Ideablock
+account was declined, so the proof itself is unaffected. A free account covers
+three protections in total; paid plans reset monthly. Upgrade at
+[app.ideablock.com/settings/plan](https://app.ideablock.com/settings/plan).
+
+**"Not recorded to Ideablock — this organization is read-only"**
+The organization's subscription is not active, so it cannot add new records.
+As above, **the commit was still tethered to Bitcoin and saved locally**;
+everything already in the account stays available to view and download. If you
+are not the person who holds the card, this is one for an administrator:
+[app.ideablock.com/organization/payment](https://app.ideablock.com/organization/payment).
+
+**The commit table printed, but nothing appears on the Commits page**
+The anchor and the web record are two separate steps, deliberately: the
+Bitcoin transaction happens first and the record sync is best-effort, so a
+backend problem can never cost you an anchor. If the table printed a
+`Bitcoin Hash`, the proof exists — check the two messages above, which are the
+usual reasons the record was declined rather than lost.
