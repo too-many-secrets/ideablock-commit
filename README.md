@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/too-many-secrets/ideablock-commit/master/assets/ib-commit.png" alt="Ideablock Commit"/>
+  <img src="https://raw.githubusercontent.com/too-many-secrets/ideablock-commit/e13a9d1c7ec0e2b5758882e1ec27741c4923a23c/assets/ib-commit.png" alt="Ideablock Commit"/>
 </p>
 
 # Prove when you wrote it
